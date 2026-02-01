@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>IoT SCADA Cloud PRO SAFE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+<style>
+body{margin:0;background:#0b1220;font-family:Arial;color:white;}
+h2{text-align:center;padding:5px;}
+#clock{text-align:center;font-size:18px;margin-bottom:5px;color:#ffd54f;}
+.card{background:#162033;margin:10px;padding:15px;border-radius:12px;}
+.row{display:flex;justify-content:space-between;align-items:center;}
+button{padding:8px 14px;border:1px solid #555;border-radius:10px;margin:3px;background:#fff;color:#000;cursor:pointer;}
+button.on.active{background:#2ecc71;color:white;}
+button.off.active{background:#e74c3c;color:white;}
+button.auto.active{background:#3498db;color:white;}
+button.manual.active{background:#9b59b6;color:white;}
+button.set.active{background:#f1c40f;color:black;}
+.days span{padding:4px 6px;border:1px solid #777;border-radius:6px;margin:2px;cursor:pointer;}
+.days span.active{background:#00c3ff;color:black;}
+.dot{width:14px;height:14px;border-radius:50%;background:#555;}
+.dot.on{background:#2ecc71;}
+input{border-radius:6px;border:0;padding:4px;}
+#log{font-size:12px;color:#aaa;margin:5px;}
+</style>
+</head>
+
+<body>
+
+<h2>🌐 IoT SCADA Cloud PRO SAFE</h2>
+<div id="clock"></div>
+<div id="log">Connecting...</div>
+
+<div id="relays"></div>
+
+<script>
+// ---------- CLOCK ----------
+setInterval(()=>{
+  document.getElementById("clock").innerText=new Date().toLocaleString();
+},1000);
+
+// ---------- BUILD UI FIRST ----------
+let html="";
+for(let i=0;i<3;i++){
+html+=`
+<div class="card">
+  <div class="row">
+    <b>Relay ${i+1}</b>
+    <div id="dot${i}" class="dot"></div>
+  </div>
+
+  <button id="on_${i}" class="on" onclick="cmd(${i},'ON')">ON</button>
+  <button id="off_${i}" class="off" onclick="cmd(${i},'OFF')">OFF</button>
+  <button id="auto_${i}" class="auto" onclick="mode(${i},'AUTO')">AUTO</button>
+  <button id="man_${i}" class="manual" onclick="mode(${i},'MANUAL')">MANUAL</button>
+  <br><br>
+
+  ⏱1 ON <input type="time" id="on1_${i}">
+  OFF <input type="time" id="off1_${i}"><br>
+
+  ⏱2 ON <input type="time" id="on2_${i}">
+  OFF <input type="time" id="off2_${i}"><br>
+
+  💧 Limit <input type="number" id="limit_${i}" value="20" style="width:60px"> นาที<br>
+
+  📅 <div class="days" id="days_${i}">
+    <span class="active">จ</span><span class="active">อ</span><span class="active">พ</span>
+    <span class="active">พฤ</span><span class="active">ศ</span><span>ส</span><span>อา</span>
+  </div>
+
+  <button id="set_${i}" class="set" onclick="setSch(${i})">SET</button>
+</div>`;
+}
+document.getElementById("relays").innerHTML=html;
+
+document.querySelectorAll(".days span").forEach(s=>{
+  s.onclick=()=>s.classList.toggle("active");
+});
+
+// ---------- MQTT ----------
+const HOST="32e535b117b843a3986a5be4386fa1d7.s1.eu.hivemq.cloud";
+const USER="vegetable";
+const PASS="Atipan.2530";
+
+let relayState=[0,0,0];
+let relayMode=["MANUAL","MANUAL","MANUAL"];
+
+let client = mqtt.connect(`wss://${HOST}:8884/mqtt`,{
+  username: USER,
+  password: PASS,
+  reconnectPeriod:3000
+});
+
+client.on("connect",()=>{
+  log("MQTT Connected");
+  client.subscribe("home/scada/relay/+/state");
+});
+
+client.on("message",(topic,msg)=>{
+  let v=msg.toString();
+  if(topic.includes("/relay/")){
+    let i=parseInt(topic.split("/")[3]);
+    relayState[i]=v;
+    syncUI(i);
+  }
+});
+
+// ---------- FUNCTIONS ----------
+function cmd(i,v){
+  relayMode[i]="MANUAL";
+  client.publish(`home/scada/relay/${i}/cmd`,v);
+  syncUI(i);
+}
+
+function mode(i,v){
+  relayMode[i]=v;
+  client.publish(`home/scada/relay/${i}/mode`,v);
+  syncUI(i);
+}
+
+function setSch(i){
+  let t1on=document.getElementById(`on1_${i}`).value;
+  let t1off=document.getElementById(`off1_${i}`).value;
+  let t2on=document.getElementById(`on2_${i}`).value;
+  let t2off=document.getElementById(`off2_${i}`).value;
+  let limit=document.getElementById(`limit_${i}`).value;
+
+  let days="";
+  document.querySelectorAll(`#days_${i} span`).forEach(d=>{
+    days+=d.classList.contains("active")?"1":"0";
+  });
+
+  let payload=`${t1on}-${t1off},${t2on}-${t2off}|${days}|${limit}`;
+  client.publish(`home/scada/relay/${i}/sch`,payload);
+
+  document.getElementById(`set_${i}`).classList.add("active");
+}
+
+document.querySelectorAll("input").forEach(i=>{
+  i.oninput=()=>{
+    let id=i.id.split("_")[1];
+    let b=document.getElementById(`set_${id}`);
+    if(b) b.classList.remove("active");
+  }
+});
+
+function syncUI(i){
+  document.getElementById("dot"+i).classList.toggle("on",relayState[i]=="1");
+
+  ["on","off","auto","man"].forEach(k=>{
+    document.getElementById(`${k}_${i}`).classList.remove("active");
+  });
+
+  if(relayMode[i]=="AUTO"){
+    document.getElementById(`auto_${i}`).classList.add("active");
+  }else{
+    document.getElementById(`man_${i}`).classList.add("active");
+    if(relayState[i]=="1") document.getElementById(`on_${i}`).classList.add("active");
+    else document.getElementById(`off_${i}`).classList.add("active");
+  }
+}
+
+function log(t){
+  document.getElementById("log").innerText=t;
+}
+</script>
+
+</body>
+</html>
