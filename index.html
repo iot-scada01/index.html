@@ -42,7 +42,7 @@ setInterval(()=>{
   document.getElementById("clock").innerText=new Date().toLocaleString();
 },1000);
 
-// ---------- BUILD UI FIRST ----------
+// ---------- BUILD UI ----------
 let html="";
 for(let i=0;i<3;i++){
 html+=`
@@ -97,21 +97,30 @@ let client = mqtt.connect(`wss://${HOST}:8884/mqtt`,{
 client.on("connect",()=>{
   log("MQTT Connected");
   client.subscribe("home/scada/relay/+/state");
+  client.subscribe("home/scada/relay/+/mode");
 });
 
 client.on("message",(topic,msg)=>{
   let v=msg.toString();
-  if(topic.includes("/relay/")){
-    let i=parseInt(topic.split("/")[3]);
+  let i=parseInt(topic.split("/")[3]);
+
+  if(topic.endsWith("/state")){
     relayState[i]=v;
-    syncUI(i);
   }
+
+  if(topic.endsWith("/mode")){
+    relayMode[i]=v;
+  }
+
+  syncUI(i);
 });
 
 // ---------- FUNCTIONS ----------
 function cmd(i,v){
+  if(relayMode[i]=="AUTO") return;
   relayMode[i]="MANUAL";
   client.publish(`home/scada/relay/${i}/cmd`,v);
+  client.publish(`home/scada/relay/${i}/mode`,"MANUAL");
   syncUI(i);
 }
 
@@ -136,7 +145,11 @@ function setSch(i){
   let payload=`${t1on}-${t1off},${t2on}-${t2off}|${days}|${limit}`;
   client.publish(`home/scada/relay/${i}/sch`,payload);
 
+  relayMode[i]="AUTO";
+  client.publish(`home/scada/relay/${i}/mode`,"AUTO");
+
   document.getElementById(`set_${i}`).classList.add("active");
+  syncUI(i);
 }
 
 document.querySelectorAll("input").forEach(i=>{
