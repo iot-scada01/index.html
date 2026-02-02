@@ -6,35 +6,469 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<!-- Chart.js สำหรับกราฟสรุป -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body{margin:0;background:#0b1220;font-family:Arial;color:white;}
-h2{text-align:center;padding:5px;}
-#clock{text-align:center;font-size:18px;margin-bottom:5px;color:#ffd54f;}
-.card{background:#162033;margin:10px;padding:15px;border-radius:12px;}
-.row{display:flex;justify-content:space-between;align-items:center;}
-button{padding:8px 14px;border:1px solid #555;border-radius:10px;margin:3px;background:#fff;color:#000;cursor:pointer;}
-button.on.active{background:#2ecc71;color:white;}
-button.off.active{background:#e74c3c;color:white;}
-button.auto.active{background:#3498db;color:white;}
-button.manual.active{background:#9b59b6;color:white;}
-button.set.active{background:#f1c40f;color:black;}
-.days span{padding:4px 6px;border:1px solid #777;border-radius:6px;margin:2px;cursor:pointer;}
-.days span.active{background:#00c3ff;color:black;}
-.dot{width:14px;height:14px;border-radius:50%;background:#555;}
-.dot.on{background:#2ecc71;}
-input{border-radius:6px;border:0;padding:4px;}
-#log{font-size:12px;color:#aaa;margin:5px;}
+:root{
+  --bg-main:#020617;
+  --bg-card:#0f172a;
+  --bg-card-soft:#111827;
+  --accent:#38bdf8;
+  --success:#22c55e;
+  --danger:#ef4444;
+  --warn:#facc15;
+  --text-main:#e5e7eb;
+  --text-muted:#9ca3af;
+  --border-soft:#1f2933;
+  --shadow-soft:0 18px 45px rgba(0,0,0,0.4);
+}
+
+*{box-sizing:border-box;}
+
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:radial-gradient(circle at top,#0b1120 0,#020617 55%,#020617 100%);
+  color:var(--text-main);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+.app-shell{
+  display:flex;
+  flex-direction:column;
+  min-height:100vh;
+}
+
+/* ---------- HEADER ---------- */
+.app-header{
+  background:rgba(15,23,42,0.95);
+  border-bottom:1px solid rgba(148,163,184,0.2);
+  backdrop-filter:blur(14px);
+  position:sticky;
+  top:0;
+  z-index:20;
+}
+
+.header-inner{
+  max-width:1400px;
+  margin:0 auto;
+  padding:10px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.app-title{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.app-logo{
+  width:32px;
+  height:32px;
+  border-radius:10px;
+  background:conic-gradient(from 210deg,#22c55e,#38bdf8,#f97316,#22c55e);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 0 16px rgba(56,189,248,0.6);
+}
+
+.app-logo span{
+  font-size:16px;
+  font-weight:700;
+  color:#020617;
+}
+
+.app-text-main{
+  font-weight:600;
+  letter-spacing:0.02em;
+}
+
+.app-text-sub{
+  font-size:12px;
+  color:var(--text-muted);
+}
+
+.header-meta{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:12px;
+  color:var(--text-muted);
+}
+
+.badge-live{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:rgba(34,197,94,0.12);
+  color:var(--success);
+  border:1px solid rgba(34,197,94,0.5);
+  font-size:11px;
+}
+.badge-live-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--success);
+  box-shadow:0 0 8px rgba(34,197,94,0.9);
+}
+
+/* ---------- MAIN LAYOUT ---------- */
+.app-main{
+  flex:1;
+  max-width:1400px;
+  width:100%;
+  margin:0 auto;
+  padding:16px;
+}
+
+.top-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:12px;
+  margin-bottom:10px;
+}
+
+.section-title{
+  font-size:14px;
+  font-weight:600;
+  color:var(--text-muted);
+  text-transform:uppercase;
+  letter-spacing:0.08em;
+}
+
+#clock{
+  font-size:14px;
+  color:var(--accent);
+}
+
+#log{
+  font-size:12px;
+  color:var(--text-muted);
+}
+
+/* ---------- CARDS & GRID ---------- */
+.card{
+  background:var(--bg-card);
+  margin:10px 0;
+  padding:14px 16px;
+  border-radius:14px;
+  box-shadow:var(--shadow-soft);
+  border:1px solid rgba(30,64,175,0.6);
+}
+
+.card-soft{
+  background:var(--bg-card-soft);
+  border-radius:12px;
+  padding:12px 14px;
+  border:1px solid rgba(31,41,55,0.8);
+}
+
+.card-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+}
+
+.card-header h3{
+  margin:0;
+  font-size:15px;
+}
+
+.card-header small{
+  color:var(--text-muted);
+}
+
+.grid{
+  display:grid;
+  gap:14px;
+}
+
+.grid-3{
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+}
+
+.grid-2{
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+}
+
+/* ---------- RELAY CARD ---------- */
+.relay-card-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.relay-label{
+  font-weight:600;
+  font-size:14px;
+}
+
+.relay-tag{
+  font-size:11px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:rgba(15,23,42,0.9);
+  border:1px solid var(--border-soft);
+  color:var(--text-muted);
+}
+
+.row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.row-wrap{
+  flex-wrap:wrap;
+  gap:6px;
+}
+
+button{
+  padding:7px 13px;
+  border-radius:999px;
+  border:1px solid rgba(148,163,184,0.5);
+  background:rgba(15,23,42,0.9);
+  color:var(--text-main);
+  cursor:pointer;
+  font-size:13px;
+  transition:all .18s ease;
+}
+button:hover{
+  transform:translateY(-1px);
+  box-shadow:0 6px 18px rgba(15,23,42,0.6);
+  border-color:var(--accent);
+}
+button.on.active{background:var(--success);color:white;border-color:var(--success);}
+button.off.active{background:var(--danger);color:white;border-color:var(--danger);}
+button.auto.active{background:var(--accent);color:white;border-color:var(--accent);}
+button.manual.active{background:#a855f7;color:white;border-color:#a855f7;}
+button.set{font-size:12px;padding:5px 12px;}
+button.set.active{background:var(--warn);color:#1f2937;border-color:var(--warn);}
+
+.days{
+  margin-top:6px;
+}
+.days span{
+  padding:4px 7px;
+  border-radius:8px;
+  border:1px solid rgba(75,85,99,0.9);
+  margin:0 3px 3px 0;
+  cursor:pointer;
+  font-size:11px;
+  color:var(--text-muted);
+  transition:all .14s ease;
+}
+.days span.active{
+  background:var(--accent);
+  color:#020617;
+  border-color:var(--accent);
+}
+
+.dot{
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:#4b5563;
+  box-shadow:0 0 0 rgba(34,197,94,0);
+  transition:all .15s ease;
+}
+.dot.on{
+  background:var(--success);
+  box-shadow:0 0 14px rgba(34,197,94,0.9);
+}
+
+input{
+  border-radius:8px;
+  border:1px solid rgba(55,65,81,0.9);
+  padding:4px 6px;
+  background:#020617;
+  color:var(--text-main);
+  font-size:12px;
+}
+input:focus{
+  outline:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 1px rgba(56,189,248,0.4);
+}
+
+/* ---------- SUMMARY BADGES ---------- */
+.summary-badges{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:6px;
+}
+
+.summary-badge{
+  font-size:11px;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid rgba(148,163,184,0.5);
+  background:rgba(15,23,42,0.9);
+  color:var(--text-muted);
+}
+
+/* ---------- RANGE SWITCH ---------- */
+.range-switch{
+  display:flex;
+  gap:6px;
+}
+
+.range-switch button{
+  padding:4px 10px;
+  font-size:11px;
+}
+
+.range-switch button.active{
+  background:var(--accent);
+  color:#020617;
+  border-color:var(--accent);
+}
+
+/* ---------- FOOTER ---------- */
+.app-footer{
+  border-top:1px solid rgba(31,41,55,0.9);
+  padding:6px 16px 10px;
+  font-size:11px;
+  color:var(--text-muted);
+  text-align:center;
+  background:#020617;
+}
+
+/* small tweaks */
+small{color:var(--text-muted);}
 </style>
 </head>
 
 <body>
+<div class="app-shell">
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="app-title">
+        <div class="app-logo"><span>SC</span></div>
+        <div>
+          <div class="app-text-main">IoT SCADA Cloud PRO SAFE</div>
+          <div class="app-text-sub">Smart Farm · Auto Irrigation · Monitoring</div>
+        </div>
+      </div>
+      <div class="header-meta">
+        <div class="badge-live">
+          <div class="badge-live-dot"></div>
+          <span>MQTT STATUS</span>
+        </div>
+        <div id="clock">--/--/---- --:--:--</div>
+      </div>
+    </div>
+  </header>
 
-<h2>🌐 IoT SCADA Cloud PRO SAFE</h2>
-<div id="clock"></div>
-<div id="log">Connecting...</div>
+  <!-- MAIN -->
+  <main class="app-main">
+    <div class="top-row">
+      <div class="section-title">Dashboard Overview</div>
+      <div id="log">Connecting...</div>
+    </div>
 
-<div id="relays"></div>
+    <!-- 🔹 SUMMARY CARD WITH CHART -->
+    <section>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3>📊 สรุปปริมาณน้ำย้อนหลัง</h3>
+            <small>ข้อมูลจาก Flow Meter (YF-S201) · หน่วยลิตร (L)</small>
+          </div>
+          <div class="range-switch">
+            <button class="range-btn active" data-range="day">1 วัน</button>
+            <button class="range-btn" data-range="week">1 สัปดาห์</button>
+            <button class="range-btn" data-range="month">1 เดือน</button>
+          </div>
+        </div>
+        <div style="position:relative;width:100%;max-width:100%;height:240px;">
+          <canvas id="flowSummaryChart"></canvas>
+        </div>
+        <div class="summary-badges">
+          <div class="summary-badge" id="flowBadge_0">Zone 1 · -- L</div>
+          <div class="summary-badge" id="flowBadge_1">Zone 2 · -- L</div>
+          <div class="summary-badge" id="flowBadge_2">Zone 3 · -- L</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RELAY GRID -->
+    <section>
+      <div class="card-header" style="margin-bottom:4px;">
+        <h3>Relay Control (3 Zones)</h3>
+        <small>ควบคุมโซนรดน้ำ · Manual / Auto พร้อมตารางเวลา</small>
+      </div>
+      <div id="relays" class="grid grid-3"></div>
+    </section>
+
+    <!-- LOWER GRID: SOIL / FLOW / DHT -->
+    <section style="margin-top:16px;">
+      <div class="grid grid-2">
+        <!-- Soil -->
+        <div class="card">
+          <div class="card-header">
+            <h3>🌱 Soil Sensor Control</h3>
+            <small>หยุดรดน้ำเมื่อดินแฉะเกินค่าที่ตั้ง</small>
+          </div>
+          <div class="card-soft">
+            <small>
+              ถ้าไม่ติ๊ก "ใช้เซนเซอร์" หรือไม่ต่อเซนเซอร์ ระบบยังรันตามเวลาเดิมตามปกติ
+            </small>
+          </div>
+          <div id="soilZones" style="margin-top:10px;"></div>
+        </div>
+
+        <!-- Flow -->
+        <div class="card">
+          <div class="card-header">
+            <h3>💧 Flow Meter (YF-S201)</h3>
+            <small>ตรวจปริมาณน้ำต่อวันของแต่ละโซน</small>
+          </div>
+          <div class="card-soft">
+            <small>
+              ถ้าไม่ติ๊ก "ใช้ Flow" หรือเซนเซอร์เสีย ระบบรันตามเวลาเดิม ไม่ใช้ Flow ในการสั่งเปิด/ปิดน้ำ
+            </small>
+          </div>
+          <div id="flowZones" style="margin-top:10px;"></div>
+        </div>
+      </div>
+
+      <!-- DHT22 -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header">
+          <h3>🌡️ DHT22 Temp / RH (3 Sensors)</h3>
+          <small>ติดตามอุณหภูมิ / ความชื้น · เตรียมไว้ควบคุมพ่นหมอก/พัดลม</small>
+        </div>
+        <div class="card-soft">
+          <small>
+            ถ้าไม่ติ๊ก "ใช้ DHT" หรือเซนเซอร์เสีย ระบบรดน้ำจะยังทำงานตามเวลาเดิมปกติ
+          </small>
+        </div>
+        <!-- ปรับเป็น grid แนวนอน -->
+        <div id="dhtCards" class="grid grid-3" style="margin-top:10px;"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="app-footer">
+    Smart Farm Dashboard · Powered by MQTT · Designed for ESP8266 / ESP32
+  </footer>
+</div>
 
 <script>
 // ---------- CLOCK ----------
@@ -42,43 +476,304 @@ setInterval(()=>{
   document.getElementById("clock").innerText=new Date().toLocaleString();
 },1000);
 
-// ---------- BUILD UI ----------
+// ---------- HELPERS & GLOBALS ----------
+let flowToday = [0,0,0];   // ปริมาณน้ำของวันนี้ (แต่ละโซน)
+let flowChart = null;
+let currentRange = "day";
+let flowHistory = {};      // { "YYYY-MM-DD": [z1,z2,z3], ... }
+const FLOW_HISTORY_KEY = "scada_flow_history";
+
+// คืนค่า "YYYY-MM-DD"
+function todayKey(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const da = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${da}`;
+}
+
+// แปลงวันที่เป็น label เช่น "28/01"
+function formatDateLabel(dateStr){
+  const parts = dateStr.split("-");
+  if(parts.length!==3) return dateStr;
+  return `${parts[2]}/${parts[1]}`;
+}
+
+function loadFlowHistory(){
+  try{
+    const raw = localStorage.getItem(FLOW_HISTORY_KEY);
+    if(raw){
+      const obj = JSON.parse(raw);
+      if(obj && typeof obj === "object") flowHistory = obj;
+    }
+  }catch(e){
+    flowHistory = {};
+  }
+}
+
+function saveFlowHistory(){
+  try{
+    localStorage.setItem(FLOW_HISTORY_KEY, JSON.stringify(flowHistory));
+  }catch(e){}
+}
+
+// ---------- BUILD RELAY UI ----------
 let html="";
 for(let i=0;i<3;i++){
 html+=`
 <div class="card">
-  <div class="row">
-    <b>Relay ${i+1}</b>
+  <div class="card-header">
+    <div class="relay-card-title">
+      <span class="relay-label">Relay ${i+1}</span>
+      <span class="relay-tag">Zone ${i+1}</span>
+    </div>
     <div id="dot${i}" class="dot"></div>
   </div>
 
-  <button id="on_${i}" class="on" onclick="cmd(${i},'ON')">ON</button>
-  <button id="off_${i}" class="off" onclick="cmd(${i},'OFF')">OFF</button>
-  <button id="auto_${i}" class="auto" onclick="mode(${i},'AUTO')">AUTO</button>
-  <button id="man_${i}" class="manual" onclick="mode(${i},'MANUAL')">MANUAL</button>
-  <br><br>
+  <div class="row row-wrap" style="margin-bottom:8px;">
+    <div>
+      <button id="on_${i}" class="on" onclick="cmd(${i},'ON')">ON</button>
+      <button id="off_${i}" class="off" onclick="cmd(${i},'OFF')">OFF</button>
+    </div>
+    <div>
+      <button id="auto_${i}" class="auto" onclick="mode(${i},'AUTO')">AUTO</button>
+      <button id="man_${i}" class="manual" onclick="mode(${i},'MANUAL')">MANUAL</button>
+    </div>
+  </div>
 
-  ⏱1 ON <input type="time" id="on1_${i}">
-  OFF <input type="time" id="off1_${i}"><br>
+  <div style="font-size:12px;margin-bottom:6px;">
+    ⏱ รอบที่ 1:
+    ON <input type="time" id="on1_${i}">
+    OFF <input type="time" id="off1_${i}">
+  </div>
 
-  ⏱2 ON <input type="time" id="on2_${i}">
-  OFF <input type="time" id="off2_${i}"><br>
+  <div style="font-size:12px;margin-bottom:6px;">
+    ⏱ รอบที่ 2:
+    ON <input type="time" id="on2_${i}">
+    OFF <input type="time" id="off2_${i}">
+  </div>
 
-  💧 Limit <input type="number" id="limit_${i}" value="20" style="width:60px"> นาที<br>
+  <div style="font-size:12px;margin-bottom:6px;">
+    💧 Limit
+    <input type="number" id="limit_${i}" value="60" style="width:60px"> วินาที / รอบ
+  </div>
 
-  📅 <div class="days" id="days_${i}">
+  <div style="font-size:12px;margin-bottom:4px;">📅 วันที่ทำงาน</div>
+  <div class="days" id="days_${i}">
     <span class="active">จ</span><span class="active">อ</span><span class="active">พ</span>
     <span class="active">พฤ</span><span class="active">ศ</span><span>ส</span><span>อา</span>
   </div>
 
-  <button id="set_${i}" class="set" onclick="setSch(${i})">SET</button>
+  <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
+    <button id="reset_${i}" class="set" onclick="resetSch(${i})">RESET</button>
+    <button id="set_${i}" class="set" onclick="setSch(${i})">SET</button>
+  </div>
 </div>`;
 }
 document.getElementById("relays").innerHTML=html;
 
+// ปรับ event วันที่ทำงาน: toggle + รีเซ็ตสีปุ่ม SET
 document.querySelectorAll(".days span").forEach(s=>{
-  s.onclick=()=>s.classList.toggle("active");
+  s.onclick=()=>{
+    s.classList.toggle("active");
+    const parent = s.parentElement;
+    if(parent && parent.id && parent.id.startsWith("days_")){
+      const id = parent.id.split("_")[1];
+      const b = document.getElementById(`set_${id}`);
+      if(b) b.classList.remove("active");
+    }
+  };
 });
+
+// ---------- BUILD SOIL & FLOW UI ----------
+let soilHtml="";
+let flowHtml="";
+for(let i=0;i<3;i++){
+  soilHtml+=`
+  <div class="card-soft" style="margin-bottom:8px;">
+    <div class="row row-wrap">
+      <div>โซน ${i+1} : ดิน <b><span id="soilVal_${i}">--</span>%</b></div>
+      <div style="font-size:12px;">
+        ใช้เซนเซอร์
+        <input type="checkbox" id="soilUse_${i}">
+        &nbsp;ต่ำสุด
+        <input type="number" id="soilMin_${i}" value="0" style="width:60px">
+        สูงสุด
+        <input type="number" id="soilMax_${i}" value="100" style="width:60px">
+        <button id="soilReset_${i}" class="set" onclick="resetSoil(${i})">RESET</button>
+        <button id="soilSet_${i}" class="set" onclick="setSoil(${i})">SET</button>
+      </div>
+    </div>
+  </div>`;
+
+  flowHtml+=`
+  <div class="card-soft" style="margin-bottom:8px;">
+    <div class="row row-wrap">
+      <div>โซน ${i+1} : วันนี้ <b><span id="flowVal_${i}">--</span> L</b></div>
+      <div style="font-size:12px;">
+        ใช้ Flow
+        <input type="checkbox" id="flowUse_${i}">
+        &nbsp;ต่ำสุด
+        <input type="number" id="flowMin_${i}" value="0" style="width:60px">
+        สูงสุด
+        <input type="number" id="flowMax_${i}" value="100" style="width:60px">
+        <button id="flowReset_${i}" class="set" onclick="resetFlow(${i})">RESET</button>
+        <button id="flowSet_${i}" class="set" onclick="setFlow(${i})">SET</button>
+      </div>
+    </div>
+  </div>`;
+}
+document.getElementById("soilZones").innerHTML = soilHtml;
+document.getElementById("flowZones").innerHTML = flowHtml;
+
+// ---------- BUILD DHT22 UI (3 เซ็นเซอร์) ----------
+let dhtHtml = "";
+for(let i=0;i<3;i++){
+  dhtHtml += `
+  <div class="card-soft">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div><b>Sensor ${i+1}</b></div>
+      <div style="font-size:12px;">
+        Temp: <b><span id="tempVal_${i}">--</span> °C</b> ·
+        RH: <b><span id="humVal_${i}">--</span> %</b>
+      </div>
+    </div>
+
+    <div style="font-size:12px;margin-bottom:6px;">
+      ใช้ DHT
+      <input type="checkbox" id="dhtUse_${i}">
+    </div>
+
+    <div style="font-size:12px;margin-bottom:4px;">
+      Temp ต่ำสุด
+      <input type="number" id="tempMin_${i}" style="width:60px" value="20">
+      สูงสุด
+      <input type="number" id="tempMax_${i}" style="width:60px" value="35">
+    </div>
+
+    <div style="font-size:12px;margin-bottom:6px;">
+      RH ต่ำสุด
+      <input type="number" id="humMin_${i}" style="width:60px" value="50">
+      สูงสุด
+      <input type="number" id="humMax_${i}" style="width:60px" value="90">
+    </div>
+
+    <div style="text-align:right;margin-top:4px;">
+      <button id="dhtReset_${i}" class="set" onclick="resetDht(${i})">RESET</button>
+      <button id="dhtSet_${i}" class="set" onclick="setDht(${i})">SET</button>
+    </div>
+  </div>`;
+}
+document.getElementById("dhtCards").innerHTML = dhtHtml;
+
+// ---------- RANGE BUTTONS ----------
+document.querySelectorAll(".range-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".range-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    currentRange = btn.dataset.range || "day";
+    rebuildFlowChart(currentRange);
+  });
+});
+
+// ---------- INIT FLOW SUMMARY CHART ----------
+function initFlowChart(){
+  const ctx = document.getElementById("flowSummaryChart");
+  if(!ctx || typeof Chart === "undefined") return;
+
+  flowChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: [],
+      datasets: [
+        { label: "Zone 1", data: [] },
+        { label: "Zone 2", data: [] },
+        { label: "Zone 3", data: [] }
+      ]
+    },
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      scales:{
+        y:{
+          beginAtZero:true,
+          ticks:{color:"#9ca3af",font:{size:11}},
+          grid:{color:"rgba(55,65,81,0.5)"}
+        },
+        x:{
+          ticks:{color:"#9ca3af",font:{size:11}},
+          grid:{display:false}
+        }
+      },
+      plugins:{
+        legend:{
+          labels:{color:"#e5e7eb",font:{size:11}}
+        },
+        tooltip:{
+          callbacks:{
+            label:(ctx)=>{
+              let v = ctx.parsed.y || 0;
+              return " " + v.toFixed(2) + " L";
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// สร้างกราฟจาก flowHistory ตามช่วงเวลา
+function rebuildFlowChart(range){
+  if(!flowChart) return;
+
+  const allDates = Object.keys(flowHistory).sort();
+  if(allDates.length === 0){
+    flowChart.data.labels = [];
+    flowChart.data.datasets.forEach(ds=>ds.data = []);
+    flowChart.update();
+    return;
+  }
+
+  let n = 1;
+  if(range === "week") n = 7;
+  else if(range === "month") n = 30;
+
+  const selected = allDates.slice(-n);
+  flowChart.data.labels = selected.map(formatDateLabel);
+
+  for(let z=0; z<3; z++){
+    flowChart.data.datasets[z].data = selected.map(date=>{
+      const dayArr = flowHistory[date];
+      return Array.isArray(dayArr) && dayArr[z] != null ? Number(dayArr[z]) : 0;
+    });
+  }
+
+  flowChart.update();
+}
+
+// อัปเดต badge สรุปวันนี้
+function updateFlowSummaryBadges(){
+  for(let i=0;i<3;i++){
+    const badge = document.getElementById(`flowBadge_${i}`);
+    if(badge){
+      badge.textContent = `Zone ${i+1} · ${flowToday[i].toFixed(2)} L`;
+    }
+  }
+}
+
+// โหลดประวัติจาก localStorage ก่อนสร้างกราฟ
+loadFlowHistory();
+
+// sync วันนี้ถ้ามีใน history
+const tKey = todayKey();
+if(Array.isArray(flowHistory[tKey])){
+  flowToday = flowHistory[tKey].map(v=>Number(v)||0);
+}
+
+// สร้างกราฟ และ rebuild ตามช่วงเริ่มต้น
+initFlowChart();
+rebuildFlowChart(currentRange);
+updateFlowSummaryBadges();
 
 // ---------- MQTT ----------
 const HOST="32e535b117b843a3986a5be4386fa1d7.s1.eu.hivemq.cloud";
@@ -96,26 +791,105 @@ let client = mqtt.connect(`wss://${HOST}:8884/mqtt`,{
 
 client.on("connect",()=>{
   log("MQTT Connected");
+
   client.subscribe("home/scada/relay/+/state");
   client.subscribe("home/scada/relay/+/mode");
+
+  client.subscribe("home/scada/soil/+/value");
+  client.subscribe("home/scada/flow/+/today");
+
+  client.subscribe("home/scada/dht/state");
+  client.subscribe("home/scada/dht/+/state");
 });
 
 client.on("message",(topic,msg)=>{
   let v=msg.toString();
-  let i=parseInt(topic.split("/")[3]);
 
-  if(topic.endsWith("/state")){
-    relayState[i]=v;
+  // ----- RELAY -----
+  if(topic.startsWith("home/scada/relay/")){
+    let i=parseInt(topic.split("/")[3]);
+    if(isNaN(i)) return;
+
+    if(topic.endsWith("/state")){
+      relayState[i]=v;
+    }
+
+    if(topic.endsWith("/mode")){
+      relayMode[i]=v;
+    }
+
+    syncUI(i);
+    return;
   }
 
-  if(topic.endsWith("/mode")){
-    relayMode[i]=v;
+  // ----- SOIL VALUE -----
+  if(topic.startsWith("home/scada/soil/") && topic.endsWith("/value")){
+    let i=parseInt(topic.split("/")[3]);
+    if(!isNaN(i)){
+      let el = document.getElementById(`soilVal_${i}`);
+      if(el) el.innerText = v;
+    }
+    return;
   }
 
-  syncUI(i);
+  // ----- FLOW TODAY -----
+  if(topic.startsWith("home/scada/flow/") && topic.endsWith("/today")){
+    let i=parseInt(topic.split("/")[3]);
+    if(!isNaN(i)){
+      let val = parseFloat(v);
+      if(isNaN(val)) val = 0;
+      flowToday[i] = val;
+
+      const dKey = todayKey();
+      if(!Array.isArray(flowHistory[dKey])){
+        flowHistory[dKey] = [0,0,0];
+      }
+      flowHistory[dKey][i] = val;
+      saveFlowHistory();
+
+      let el = document.getElementById(`flowVal_${i}`);
+      if(el) el.innerText = v;
+
+      updateFlowSummaryBadges();
+      rebuildFlowChart(currentRange);
+    }
+    return;
+  }
+
+  // ----- DHT22 STATE (ตัวเดียวแบบเดิม) -----
+  if(topic === "home/scada/dht/state"){
+    let parts = v.split(",");
+    if(parts.length>=2){
+      let t = parts[0];
+      let h = parts[1];
+      let tEl = document.getElementById("tempVal_0");
+      let hEl = document.getElementById("humVal_0");
+      if(tEl) tEl.innerText = t;
+      if(hEl) hEl.innerText = h;
+    }
+    return;
+  }
+
+  // ----- DHT22 STATE แบบหลายตัว -----
+  if(topic.startsWith("home/scada/dht/") && topic.endsWith("/state")){
+    let partsTopic = topic.split("/");
+    let idx = parseInt(partsTopic[3]);
+    if(!isNaN(idx)){
+      let parts = v.split(",");
+      if(parts.length>=2){
+        let t = parts[0];
+        let h = parts[1];
+        let tEl = document.getElementById(`tempVal_${idx}`);
+        let hEl = document.getElementById(`humVal_${idx}`);
+        if(tEl) tEl.innerText = t;
+        if(hEl) hEl.innerText = h;
+      }
+    }
+    return;
+  }
 });
 
-// ---------- FUNCTIONS ----------
+// ---------- FUNCTIONS เดิม ----------
 function cmd(i,v){
   if(relayMode[i]=="AUTO") return;
   relayMode[i]="MANUAL";
@@ -152,12 +926,37 @@ function setSch(i){
   syncUI(i);
 }
 
-document.querySelectorAll("input").forEach(i=>{
-  i.oninput=()=>{
-    let id=i.id.split("_")[1];
-    let b=document.getElementById(`set_${id}`);
-    if(b) b.classList.remove("active");
-  }
+// RESET: เคลียร์ค่าบน UI กลับค่าเริ่มต้น (ต้องกด SET อีกทีเพื่อส่งเข้า ESP)
+function resetSch(i){
+  document.getElementById(`on1_${i}`).value = "";
+  document.getElementById(`off1_${i}`).value = "";
+  document.getElementById(`on2_${i}`).value = "";
+  document.getElementById(`off2_${i}`).value = "";
+  document.getElementById(`limit_${i}`).value = 60;
+
+  document.querySelectorAll(`#days_${i} span`).forEach(d=>{
+    d.classList.add("active");
+  });
+
+  const b=document.getElementById(`set_${i}`);
+  if(b) b.classList.remove("active");
+}
+
+// รีเซ็ตสี SET ของ Schedule เมื่อแก้ค่า input (เฉพาะของ relay)
+document.querySelectorAll("input").forEach(inp=>{
+  inp.oninput = ()=>{
+    if(
+      inp.id.startsWith("on1_") ||
+      inp.id.startsWith("off1_") ||
+      inp.id.startsWith("on2_") ||
+      inp.id.startsWith("off2_") ||
+      inp.id.startsWith("limit_")
+    ){
+      let id=inp.id.split("_")[1];
+      let b=document.getElementById(`set_${id}`);
+      if(b) b.classList.remove("active");
+    }
+  };
 });
 
 function syncUI(i){
@@ -178,6 +977,140 @@ function syncUI(i){
 
 function log(t){
   document.getElementById("log").innerText=t;
+}
+
+// ---------- ฟังก์ชัน Soil / Flow / DHT Config ----------
+
+// Soil: ส่ง "use|min|max"
+function setSoil(i){
+  let use  = document.getElementById(`soilUse_${i}`).checked;
+  let min  = document.getElementById(`soilMin_${i}`).value || "0";
+  let max  = document.getElementById(`soilMax_${i}`).value || "0";
+
+  if(!use){
+    min = "0";
+    max = "0";
+  }
+
+  let payload = `${use ? "1" : "0"}|${min}|${max}`;
+  client.publish(`home/scada/soil/${i}/cfg`, payload);
+
+  let btn = document.getElementById(`soilSet_${i}`);
+  if(btn) btn.classList.add("active");
+}
+
+// Soil RESET
+function resetSoil(i){
+  document.getElementById(`soilUse_${i}`).checked = false;
+  document.getElementById(`soilMin_${i}`).value = 0;
+  document.getElementById(`soilMax_${i}`).value = 100;
+  let btn = document.getElementById(`soilSet_${i}`);
+  if(btn) btn.classList.remove("active");
+}
+
+// Flow: ส่ง "min|max"; ไม่ใช้ -> 0|0
+function setFlow(i){
+  let use = document.getElementById(`flowUse_${i}`).checked;
+  let min = document.getElementById(`flowMin_${i}`).value || "0";
+  let max = document.getElementById(`flowMax_${i}`).value || "0";
+
+  if(!use){
+    min = 0;
+    max = 0;
+  }
+
+  let payload = `${min}|${max}`;
+  client.publish(`home/scada/flow/${i}/cfg`, payload);
+
+  let btn = document.getElementById(`flowSet_${i}`);
+  if(btn) btn.classList.add("active");
+}
+
+// Flow RESET
+function resetFlow(i){
+  document.getElementById(`flowUse_${i}`).checked = false;
+  document.getElementById(`flowMin_${i}`).value = 0;
+  document.getElementById(`flowMax_${i}`).value = 100;
+  let btn = document.getElementById(`flowSet_${i}`);
+  if(btn) btn.classList.remove("active");
+}
+
+// DHT: payload "tmin,tmax|hmin,hmax"; ไม่ใช้ -> 0,0|0,0
+function setDht(i){
+  let use = document.getElementById(`dhtUse_${i}`).checked;
+
+  let tmin = document.getElementById(`tempMin_${i}`).value || "";
+  let tmax = document.getElementById(`tempMax_${i}`).value || "";
+  let hmin = document.getElementById(`humMin_${i}`).value || "";
+  let hmax = document.getElementById(`humMax_${i}`).value || "";
+
+  if(!use){
+    tmin = "0";
+    tmax = "0";
+    hmin = "0";
+    hmax = "0";
+  }
+
+  let payload = `${tmin},${tmax}|${hmin},${hmax}`;
+
+  if(i === 0){
+    client.publish("home/scada/dht/cfg", payload);
+  }
+  client.publish(`home/scada/dht/${i}/cfg`, payload);
+
+  let btn = document.getElementById(`dhtSet_${i}`);
+  if(btn) btn.classList.add("active");
+}
+
+// DHT RESET
+function resetDht(i){
+  document.getElementById(`dhtUse_${i}`).checked = false;
+  document.getElementById(`tempMin_${i}`).value = 20;
+  document.getElementById(`tempMax_${i}`).value = 35;
+  document.getElementById(`humMin_${i}`).value = 50;
+  document.getElementById(`humMax_${i}`).value = 90;
+  let btn = document.getElementById(`dhtSet_${i}`);
+  if(btn) btn.classList.remove("active");
+}
+
+// ล้างสี SET ของ SOIL / FLOW / DHT เมื่อแก้ค่า
+for(let i=0;i<3;i++){
+  // Soil
+  let su   = document.getElementById(`soilUse_${i}`);
+  let smin = document.getElementById(`soilMin_${i}`);
+  let smax = document.getElementById(`soilMax_${i}`);
+  if(su){
+    su.oninput = smin.oninput = smax.oninput = ()=>{
+      let btn = document.getElementById(`soilSet_${i}`);
+      if(btn) btn.classList.remove("active");
+    };
+  }
+
+  // Flow
+  let fu = document.getElementById(`flowUse_${i}`);
+  let fmin = document.getElementById(`flowMin_${i}`);
+  let fmax = document.getElementById(`flowMax_${i}`);
+  if(fu){
+    fu.oninput = fmin.oninput = fmax.oninput = ()=>{
+      let btn = document.getElementById(`flowSet_${i}`);
+      if(btn) btn.classList.remove("active");
+    };
+  }
+
+  // DHT
+  let du   = document.getElementById(`dhtUse_${i}`);
+  let tmin = document.getElementById(`tempMin_${i}`);
+  let tmax = document.getElementById(`tempMax_${i}`);
+  let hmin = document.getElementById(`humMin_${i}`);
+  let hmax = document.getElementById(`humMax_${i}`);
+  if(du)   du.oninput   = ()=>{
+    let btn = document.getElementById(`dhtSet_${i}`);
+    if(btn) btn.classList.remove("active");
+  };
+  if(tmin) tmin.oninput = tmax.oninput = hmin.oninput = hmax.oninput = ()=>{
+    let btn = document.getElementById(`dhtSet_${i}`);
+    if(btn) btn.classList.remove("active");
+  };
 }
 </script>
 
